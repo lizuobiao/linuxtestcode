@@ -1,0 +1,1 @@
+cmd_/home/biao/testcode/ingenic_drv/gpio-quectel.ko := mips-linux-gnu-ld -r  -m elf32ltsmip -T /home/biao/sdb1/ingenic-linux-kernel3.10.14-x1000-v6.0-20170428/kernel/scripts/module-common.lds --build-id  -o /home/biao/testcode/ingenic_drv/gpio-quectel.ko /home/biao/testcode/ingenic_drv/gpio-quectel.o /home/biao/testcode/ingenic_drv/gpio-quectel.mod.o
