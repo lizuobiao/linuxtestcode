@@ -17,23 +17,24 @@
 
 using namespace std;
 
-#define FILEPATHLEN 64
+#define MAXLEN 64
 
 typedef struct
 {
 	int flag;
-	char filepath[FILEPATHLEN];
+	uint32_t data_len;
+	char data[MAXLEN];
 }file_path_stu;
 	
 class Filelist{
     public:
 		static Filelist* getInstance(void);
-		string get_filepath(void);
-		int clear_filepath(string filepath);
-		void set_filepath(string filepath);
-		void ergodic_filepath(void);
-		void set_filepath_writefile(string filepath);
-		int clear_filepath_writefile(string filepath);
+		string get_data(void);
+		int clear_data(string data);
+		void set_data(string data);
+		void ergodic_data(void);
+		void set_data_writefile(string data);
+		int clear_data_writefile(string data);
 		
 	private:
 		Filelist(const char* path);

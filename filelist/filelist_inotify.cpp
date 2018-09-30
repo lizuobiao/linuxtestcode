@@ -1,10 +1,12 @@
 #include "filelist.h"
 
+#define PICTUREPATH  "./picture/upload/"
+
 
 Filelist::Filelist(const char* path)
 {
 	DIR *dir;
-    char basePath[128];
+ //   char basePath[128];
 	
 	path_ = path;
 	
@@ -13,21 +15,21 @@ Filelist::Filelist(const char* path)
     printf("the current dir is : %s\n",basePath);*/
 
     //get the file list
-    memset(basePath,'\0',sizeof(basePath));
-    strcpy(basePath,path_.c_str());
-    readFilevect(basePath);
+//    memset(basePath,'\0',sizeof(basePath));
+//    strcpy(basePath,path_.c_str());
+    readFilevect(path_.c_str());
 
 	pthread_create(&file_monitor_pthreadid, NULL, file_monitor_thread,this);
 	pthread_detach(file_monitor_pthreadid);
 }
 
-Filelist* Filelist::instance = new Filelist("./test");
+Filelist* Filelist::instance = new Filelist(PICTUREPATH);
 Filelist* Filelist::getInstance()
 {
 	return instance;
 }
 
-int Filelist::readFilevect(char *basePath)
+int Filelist::readFilevect(const char *basePath)
 {
     DIR *dir;
     struct dirent *ptr;
@@ -47,7 +49,7 @@ int Filelist::readFilevect(char *basePath)
         else if(ptr->d_type == 8)    ///file
 		{
 			 file_name = ptr->d_name;
-			 path = path_+"/"+file_name;
+			 path = path_+file_name;
 			 file_path.filepath = path;
 			 file_path.flag     = 0;
 			 Filevect.push_back(file_path);
@@ -66,6 +68,14 @@ int Filelist::readFilevect(char *basePath)
     }
      closedir(dir);
      return 1;
+}
+
+void Filelist::set_filepath(string filepath)
+{
+		file_path_stu file_path;
+		file_path.flag = 0;
+		file_path.filepath = filepath;
+		Filevect.push_back(file_path);
 }
 
 string Filelist::get_filepath(void)
@@ -93,6 +103,7 @@ int Filelist::clear_filepath(string filepath)
 	   if((*it).filepath == filepath)
 	   {
 	        (*it).flag = 0;
+			Filevect.erase(it);
 	        break;
 	   }
 	   else
@@ -105,14 +116,15 @@ int Filelist::clear_filepath(string filepath)
 
 int Filelist::watch_inotify_events(int fd)
 {
-	char event_buf[512];
+	char event_buf[512] = {0};
 	int ret;
 	int event_pos = 0;
 	int event_size = 0;
 	char *p = NULL;
 	string path;
 	file_path_stu file_path;
-		
+	std::ostringstream oss;
+	
 	struct inotify_event *event;
 	
 	/*读事件是否发生，没有发生就会阻塞*/
@@ -131,18 +143,33 @@ int Filelist::watch_inotify_events(int fd)
 		event = (struct inotify_event*)(event_buf + event_pos);
 		if(event->len)
 		{
+//			memset((char *)event->name,0,128);
 			p = strstr((char *)event->name,"filepart");
 			file_name = event->name;
-			path = path_+"/"+file_name;
+			path = path_+file_name;
 			if(event->mask & IN_CREATE)
 			{
-				printf("create file: %s\n",event->name);			
+	//			printf("create file: %s\n",event->name);			
 				if(p == NULL)
 				{	
 					 file_path.flag = 0;
 					 file_path.filepath = path;
 			 		 Filevect.push_back(file_path);
+//					 oss << "cp " << file_path.filepath << " /mnt/";		
+//					 system(oss.str().c_str());
 				}
+			}else if(event->mask & IN_MOVED_TO)
+			{
+//					printf("IN_MOVED_FROM!\n");
+					printf("IN_MOVED_FROM file: %s\n",event->name);	
+					if(p == NULL)
+					{	
+						 file_path.flag = 0;
+						 file_path.filepath = path;
+				 		 Filevect.push_back(file_path);
+//						 oss << "cp " << file_path.filepath << " /mnt/";		
+//					 	 system(oss.str().c_str());
+					}
 			}
 			else
 			{
@@ -159,7 +186,7 @@ int Filelist::watch_inotify_events(int fd)
 				   }
 				}
 				
-				printf("delete file: %s\n",event->name);
+//				printf("delete file: %s\n",event->name);
 			}
 		}
 		
@@ -186,16 +213,17 @@ void*  Filelist::file_monitor_thread(void *param)
 		return NULL;
 	}
 	/*添加watch对象*/
-	ret = inotify_add_watch(InotifyFd, "./test/", IN_CREATE |  IN_DELETE);
+	ret = inotify_add_watch(InotifyFd, PICTUREPATH, IN_CREATE |  IN_DELETE | IN_MOVED_TO);
 	
 	/*处理事件*/
 	while(1)
 	{
 		filelist->watch_inotify_events(InotifyFd);
-		for(int i = 0; i < filelist->Filevect.size(); i++)
+//		DLS_PrintInfo("picture file number : %d",filelist->Filevect.size());
+	/*	for(int i = 0; i < filelist->Filevect.size(); i++)
 		{
-	      cout << "erase value of vec [" << i << "] = " << filelist->Filevect[i].filepath << endl;
-	    }
+	      cout <<"                "<<filelist->Filevect[i].filepath << endl;
+	    }*/
 	}
  
     /*删除inotify的watch对象*/
@@ -212,67 +240,11 @@ void*  Filelist::file_monitor_thread(void *param)
 }
 
 
-pthread_t Xlink2Radio_pthread_;
-pthread_t Xfdt_thread;
-pthread_t get_gwstatu_pthread_;
-
-void *Xlink2Radiothread(void *param)
-{
-	Filelist *filelist = reinterpret_cast<Filelist*>(param);
-	string filepath = "";
-	while(1)
-	{
-		sleep(3);
-		printf("Xlink2Radiothread is start\r\n");
-		filepath = filelist->get_filepath();
-		if(filepath != "")
-		{
-			std::cout <<"filepath::"<<filepath <<std::endl;	
-			filelist->clear_filepath(filepath);
-			remove(filepath.c_str());
-		}
-		
-	}
-}
-
-void *Xfdtthread(void *param)
-{
-	Filelist *filelist = reinterpret_cast<Filelist*>(param);
-	
-	while(1)
-	{
-		sleep(4);
-		printf("Xfdtthread is start\r\n");
-		std::cout << filelist->get_filepath()<<std::endl;
-	}
-}
-
-void *get_gwstatu_sthread(void *param)
-{
-	Filelist *filelist = reinterpret_cast<Filelist*>(param);
-	
-	while(1)
-	{
-		sleep(5);
-		printf("rtkradio2fcthread is start\r\n");
-		std::cout << filelist->get_filepath()<<std::endl;	
-	}
-}
-
 
 int main(void)
 {
 	Filelist *filelist = Filelist::getInstance();
 
-	pthread_create(&get_gwstatu_pthread_, NULL, get_gwstatu_sthread,(void *)filelist);
-	pthread_detach(get_gwstatu_pthread_);
-
-	pthread_create(&Xlink2Radio_pthread_, NULL, Xlink2Radiothread,(void *)filelist);
-	pthread_detach(Xlink2Radio_pthread_);
-
-	pthread_create(&Xfdt_thread, NULL, Xfdtthread,(void *)filelist);
-	pthread_detach(Xfdt_thread);
-	
 	while(1);
 	
     return 0;
